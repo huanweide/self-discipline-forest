@@ -1,0 +1,49 @@
+name: self_discipline_app
+description: 最好的自律App — 番茄钟+种树+习惯追踪+长期计划+App锁定+间隔复习
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # 状态管理
+  flutter_riverpod: ^2.4.0
+  riverpod_annotation: ^2.3.0
+  # 本地数据库
+  drift: ^2.15.0
+  sqlite3_flutter_libs: ^0.5.0
+  path_provider: ^2.1.0
+  path: ^1.8.0
+  # 后台任务 + 通知
+  workmanager: ^0.5.2
+  flutter_local_notifications: ^16.3.0
+  # 图表
+  fl_chart: ^0.65.0
+  # 动画
+  lottie: ^2.7.0
+  # 工具
+  intl: ^0.18.0
+  shared_preferences: ^2.2.0
+  uuid: ^4.2.0
+  # App锁定
+  accessibility_service: ^0.1.0  # Android
+  # 网络(知识库同步)
+  http: ^1.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+  drift_dev: ^2.15.0
+  build_runner: ^2.4.0
+  riverpod_generator: ^2.3.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/trees/
+    - assets/animations/
+    - assets/sounds/
