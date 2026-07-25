@@ -1,3 +1,9 @@
+<!-- badges -->
+[![License](https://img.shields.io/github/license/huanweide/self-discipline-forest)](LICENSE)
+[![CI](https://github.com/huanweide/self-discipline-forest/actions/workflows/ci.yml/badge.svg)](https://github.com/huanweide/self-discipline-forest/actions/workflows/ci.yml)
+[![Stars](https://img.shields.io/github/stars/huanweide/self-discipline-forest)](https://github.com/huanweide/self-discipline-forest/stargazers)
+<!-- /badges -->
+
 # 🌳 自律森林 (Self-Discipline Forest)
 
 > 最好的自律App — 番茄钟+种树+习惯追踪+长期计划+App锁定+间隔复习
