@@ -66,6 +66,10 @@ class FocusTimerService {
   VoidCallback? onInterrupted;
   VoidCallback? onAbandoned;
 
+  /// 状态变更通知器：随帧变化的动画子树（TreeWidget/CountdownRing）监听它，
+  /// 避免整屏因每帧 setState 而重建（IMP-107）。
+  late final ValueNotifier<TimerState> stateNotifier;
+
   // Flowmodoro模式专用
   AttentionLevel _attentionLevel = AttentionLevel.focused;
   final List<AttentionLevel> _attentionHistory = [];
@@ -79,10 +83,18 @@ class FocusTimerService {
           elapsedSeconds: 0,
           totalSeconds: focusMinutes * 60,
           isRunning: false,
-        );
+        ) {
+    stateNotifier = ValueNotifier<TimerState>(_state);
+  }
 
   TimerState get state => _state;
   AttentionLevel get attentionLevel => _attentionLevel;
+
+  /// 统一更新内部状态并通知监听者（动画子树按需 repaint，而非整屏重建）。
+  void _update(TimerState next) {
+    _state = next;
+    stateNotifier.value = next;
+  }
 
   /// 开始计时——使用Ticker实现vsync同步的精确计时
   /// 参考focus-timer的requestAnimationFrame方案
@@ -92,13 +104,13 @@ class FocusTimerService {
     _ticker = vsync.createTicker(_onTick);
     _baseElapsedSeconds = _state.elapsedSeconds;
     _startedAt = DateTime.now();
-    _state = TimerState(
+    _update(TimerState(
       elapsedSeconds: _state.elapsedSeconds,
       totalSeconds: _state.totalSeconds,
       isRunning: true,
       isBreak: _state.isBreak,
       mode: _state.mode,
-    );
+    ));
     _ticker!.start();
   }
 
@@ -106,13 +118,13 @@ class FocusTimerService {
     if (_startedAt == null) return;
     final newElapsed = _baseElapsedSeconds +
         DateTime.now().difference(_startedAt!).inSeconds.abs();
-    _state = _state.copyWith(elapsedSeconds: newElapsed);
+    _update(_state.copyWith(elapsedSeconds: newElapsed));
     onTick?.call(_state);
 
     // 检查是否完成
     if (newElapsed >= _state.totalSeconds) {
       _ticker?.stop();
-      _state = _state.copyWith(isRunning: false);
+      _update(_state.copyWith(isRunning: false));
       if (_state.isBreak) {
         onBreakComplete?.call();
       } else {
@@ -124,7 +136,7 @@ class FocusTimerService {
   /// 暂停——仅在Flowmodoro模式下允许暂停
   void pause() {
     _ticker?.stop();
-    _state = _state.copyWith(isRunning: false);
+    _update(_state.copyWith(isRunning: false));
   }
 
   /// 恢复
@@ -141,7 +153,7 @@ class FocusTimerService {
     _interruptCount++;
     if (_interruptCount >= _interruptThreshold) {
       _ticker?.stop();
-      _state = _state.copyWith(isRunning: false);
+      _update(_state.copyWith(isRunning: false));
       onInterrupted?.call();
     }
   }
@@ -151,7 +163,7 @@ class FocusTimerService {
     // 仅计时进行中才允许放弃，未开始/已结束/休息时不触发枯萎
     if (!_state.isRunning) return;
     _ticker?.stop();
-    _state = _state.copyWith(isRunning: false);
+    _update(_state.copyWith(isRunning: false));
     onAbandoned?.call();
   }
 
@@ -170,7 +182,7 @@ class FocusTimerService {
       _attentionDistractedCount++;
       if (_attentionDistractedCount >= _distractedThreshold && _state.mode == TimerMode.flowmodoro) {
         _ticker?.stop();
-        _state = _state.copyWith(isRunning: false);
+        _update(_state.copyWith(isRunning: false));
         onFocusComplete?.call(); // 提前结束，计算比例休息
       }
     }
@@ -188,13 +200,13 @@ class FocusTimerService {
     final breakSecs = breakMinutes != null
         ? breakMinutes * 60
         : calculateFlowmodoroBreak();
-    _state = TimerState(
+    _update(TimerState(
       elapsedSeconds: 0,
       totalSeconds: breakSecs,
       isRunning: true,
       isBreak: true,
       mode: _state.mode,
-    );
+    ));
     start(vsync);
   }
 
@@ -203,5 +215,6 @@ class FocusTimerService {
     _ticker = null;
     _timer?.cancel();
     _timer = null;
+    stateNotifier.dispose();
   }
 }

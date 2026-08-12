@@ -19,7 +19,7 @@ class FocusScreen extends ConsumerStatefulWidget {
 class _FocusScreenState extends ConsumerState<FocusScreen>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late FocusTimerService _timerService;
-  TimerState? _timerState;
+  bool _isRunning = false; // 结构态：是否正在计时（仅开始/结束时变化，非每帧）
   bool _isBreak = false;
 
   // 预设时长选项
@@ -30,16 +30,14 @@ class _FocusScreenState extends ConsumerState<FocusScreen>
   void initState() {
     super.initState();
     _timerService = FocusTimerService(focusMinutes: 25);
-    _timerService.onTick = (state) {
-      setState(() => _timerState = state);
-    };
     _timerService.onFocusComplete = () {
+      setState(() => _isRunning = false);
       _showCompletionDialog('🎉 专注完成！', '一棵树成熟了！');
     };
     _timerService.onBreakComplete = () {
       setState(() {
         _isBreak = false;
-        _timerState = null;
+        _isRunning = false;
       });
     };
     _timerService.onInterrupted = () {
@@ -73,18 +71,26 @@ class _FocusScreenState extends ConsumerState<FocusScreen>
     // 复用前先释放旧实例（含其 Ticker），避免每次新建 FocusTimerService 泄漏
     _timerService.dispose();
     _timerService = FocusTimerService(focusMinutes: minutes)
-      ..onTick = (state) => setState(() => _timerState = state)
-      ..onFocusComplete = () => _showCompletionDialog('🎉 专注完成！', '一棵树成熟了！')
-      ..onBreakComplete = () => setState(() { _isBreak = false; _timerState = null; })
+      ..onFocusComplete = () {
+        setState(() => _isRunning = false);
+        _showCompletionDialog('🎉 专注完成！', '一棵树成熟了！');
+      }
+      ..onBreakComplete = () => setState(() { _isBreak = false; _isRunning = false; })
       ..onInterrupted = () => _showCompletionDialog('😢 树受伤了', '下次坚持住！')
       ..onAbandoned = () => _showCompletionDialog('😢 树枯萎了', '下次坚持住！');
     _timerService.start(this);
-    setState(() => _isBreak = false);
+    setState(() {
+      _isBreak = false;
+      _isRunning = true;
+    });
   }
 
   void _startBreak() {
     _timerService.startBreak(this, breakMinutes: 5);
-    setState(() => _isBreak = true);
+    setState(() {
+      _isBreak = true;
+      _isRunning = true;
+    });
   }
 
   void _showCompletionDialog(String title, String subtitle) {
@@ -102,13 +108,13 @@ class _FocusScreenState extends ConsumerState<FocusScreen>
               },
               child: const Text('休息5分钟'),
             ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              setState(() { _timerState = null; _isBreak = false; });
-            },
-            child: const Text('结束'),
-          ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                setState(() { _isRunning = false; _isBreak = false; });
+              },
+              child: const Text('结束'),
+            ),
         ],
       ),
     );
@@ -117,7 +123,9 @@ class _FocusScreenState extends ConsumerState<FocusScreen>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isRunning = _timerState?.isRunning ?? false;
+    // 结构态：是否正在计时（仅开始/结束时变化），用于决定时长选择/主按钮/注意力行的显示，
+    // 不随每帧 tick 变化，因此这些子树不会被 60fps 的动画回调重建（IMP-107）。
+    final isRunning = _isRunning;
 
     return Scaffold(
       appBar: AppBar(
@@ -131,25 +139,34 @@ class _FocusScreenState extends ConsumerState<FocusScreen>
             children: [
               const SizedBox(height: 10),
 
-              // === 树动画区 ===
-              SizedBox(
-                height: 220,
-                child: TreeWidget(
-                  progress: _timerState?.progress ?? 0.0,
-                  isRunning: isRunning,
-                  isBreak: _isBreak,
-                ),
-              ),
-
-              const SizedBox(height: 20),
-
-              // === 倒计时环 ===
-              CountdownRing(
-                progress: _timerState?.progress ?? 0.0,
-                timeText: _timerState?.timeRemainingFormatted ?? '25:00',
-                isRunning: isRunning,
-                isBreak: _isBreak,
-                size: 200,
+              // === 树动画区 + 倒计时环：仅此子树随每帧 tick 更新（IMP-107）===
+              // 通过 AnimatedBuilder 监听 stateNotifier，把 ~60次/秒的重建
+              // 限制在该子树内，时长选择/主按钮/注意力行不再被无谓重建。
+              AnimatedBuilder(
+                animation: _timerService.stateNotifier,
+                builder: (context, _) {
+                  final s = _timerService.stateNotifier.value;
+                  return Column(
+                    children: [
+                      SizedBox(
+                        height: 220,
+                        child: TreeWidget(
+                          progress: s.progress,
+                          isRunning: s.isRunning,
+                          isBreak: _isBreak,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      CountdownRing(
+                        progress: s.progress,
+                        timeText: s.timeRemainingFormatted,
+                        isRunning: s.isRunning,
+                        isBreak: _isBreak,
+                        size: 200,
+                      ),
+                    ],
+                  );
+                },
               ),
 
               const SizedBox(height: 20),
@@ -203,13 +220,13 @@ class _FocusScreenState extends ConsumerState<FocusScreen>
                     if (_isBreak) {
                       _timerService.dispose();
                       setState(() {
-                        _timerState = null;
+                        _isRunning = false;
                         _isBreak = false;
                       });
                     } else {
                       _timerService.abandon();
                       setState(() {
-                        _timerState = null;
+                        _isRunning = false;
                         _isBreak = false;
                       });
                       _timerService.dispose();
