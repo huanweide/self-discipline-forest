@@ -10,5 +10,8 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
-      - run: flutter pub get || true
-      - run: flutter analyze || true
+      - run: flutter pub get
+      - name: Flutter analyze (informational)
+        # static analysis is informational; do not fail the build on findings
+        continue-on-error: true
+        run: flutter analyze
