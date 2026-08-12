@@ -53,7 +53,8 @@ class _FocusScreenState extends ConsumerState<FocusScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+    // 仅对 paused/detached 计数；inactive（iOS 控制中心/来电横幅等瞬态）不计，避免误累加
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.detached) {
       _timerService.interrupt();
     } else if (state == AppLifecycleState.resumed) {
       _timerService.resetInterruptCount();
@@ -69,6 +70,8 @@ class _FocusScreenState extends ConsumerState<FocusScreen>
 
   void _startFocus() {
     final minutes = ref.read(selectedDurationProvider);
+    // 复用前先释放旧实例（含其 Ticker），避免每次新建 FocusTimerService 泄漏
+    _timerService.dispose();
     _timerService = FocusTimerService(focusMinutes: minutes)
       ..onTick = (state) => setState(() => _timerState = state)
       ..onFocusComplete = () => _showCompletionDialog('🎉 专注完成！', '一棵树成熟了！')

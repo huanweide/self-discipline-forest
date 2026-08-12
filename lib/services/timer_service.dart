@@ -87,6 +87,8 @@ class FocusTimerService {
   /// 开始计时——使用Ticker实现vsync同步的精确计时
   /// 参考focus-timer的requestAnimationFrame方案
   void start(TickerProvider vsync) {
+    // 复用前先释放旧 Ticker，避免每次 start/resume/startBreak 泄漏 Ticker
+    _ticker?.dispose();
     _ticker = vsync.createTicker(_onTick);
     _baseElapsedSeconds = _state.elapsedSeconds;
     _startedAt = DateTime.now();
@@ -134,6 +136,8 @@ class FocusTimerService {
   /// 中断（用户离开App）——树受伤
   /// 参考Forest的"离开即枯萎"机制，但我们给3次机会
   void interrupt() {
+    // 仅计时进行中才计中断，避免后台/未开始/已结束/休息时误伤树
+    if (!_state.isRunning) return;
     _interruptCount++;
     if (_interruptCount >= _interruptThreshold) {
       _ticker?.stop();
@@ -144,6 +148,8 @@ class FocusTimerService {
 
   /// 放弃（用户主动退出）——树枯萎
   void abandon() {
+    // 仅计时进行中才允许放弃，未开始/已结束/休息时不触发枯萎
+    if (!_state.isRunning) return;
     _ticker?.stop();
     _state = _state.copyWith(isRunning: false);
     onAbandoned?.call();
@@ -194,6 +200,8 @@ class FocusTimerService {
 
   void dispose() {
     _ticker?.dispose();
+    _ticker = null;
     _timer?.cancel();
+    _timer = null;
   }
 }
