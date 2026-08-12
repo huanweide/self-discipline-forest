@@ -47,6 +47,11 @@ class Habit {
     final now = DateTime.now();
     final fourteenDaysAgo = now.subtract(const Duration(days: 14));
 
+    // 周频率单独按「周」计预期，避免把每周 1 次误判成每天
+    if (frequency == HabitFrequency.weekly) {
+      return _calculateWeeklyHealthScore(completions);
+    }
+
     // 近14天应该完成的次数
     int expectedRecent = 0;
     int completedRecent = 0;
@@ -79,12 +84,53 @@ class Habit {
     return ((recentRate * 0.7 + totalRate * 0.3) * 100).clamp(0.0, 100.0);
   }
 
+  /// 周频率健康度：按「周」计预期次数，按「有完成的周数」计完成次数
+  static double _calculateWeeklyHealthScore(List<DateTime> completions) {
+    final now = DateTime.now();
+    final fourteenDaysAgo = now.subtract(const Duration(days: 14));
+    final recent = _weeklyStats(completions, fourteenDaysAgo, now);
+
+    int expectedTotal = 0;
+    int completedTotal = 0;
+    if (completions.isNotEmpty) {
+      final firstDay = completions.reduce((a, b) => a.isBefore(b) ? a : b);
+      final total = _weeklyStats(completions, firstDay, now);
+      expectedTotal = total.expected;
+      completedTotal = total.completed;
+    }
+
+    final recentRate = recent.expected > 0 ? (recent.completed / recent.expected).clamp(0.0, 1.0) : 0.0;
+    final totalRate = expectedTotal > 0 ? (completedTotal / expectedTotal).clamp(0.0, 1.0) : 0.0;
+    return ((recentRate * 0.7 + totalRate * 0.3) * 100).clamp(0.0, 100.0);
+  }
+
+  /// 统计某时间窗内的预期周数（天数/7 向下取整）与去重完成周数
+  static _WeeklyStats _weeklyStats(List<DateTime> completions, DateTime start, DateTime end) {
+    final days = end.difference(start).inDays;
+    final expected = (days / 7).floor();
+    final weeks = <String>{};
+    for (final c in completions) {
+      if (!c.isBefore(start) && c.isBefore(end)) {
+        weeks.add(_weekKey(c));
+      }
+    }
+    return _WeeklyStats(expected, weeks.length);
+  }
+
+  /// 年份 + 年内周序号，作为一周的唯一键
+  static String _weekKey(DateTime d) {
+    final startOfYear = DateTime(d.year, 1, 1);
+    final dayOfYear = d.difference(startOfYear).inDays;
+    final week = ((dayOfYear + startOfYear.weekday - 1) / 7).floor() + 1;
+    return '${d.year}-$week';
+  }
+
   static bool _isActiveDay(DateTime date, HabitFrequency freq, List<int> days) {
     switch (freq) {
       case HabitFrequency.daily:
         return true;
       case HabitFrequency.weekly:
-        return true; // 每周任何一天都算
+        return true; // 周频率在 calculateHealthScore 中按周单独计，不走此分支
       case HabitFrequency.customDays:
         return days.contains(date.weekday); // 1=Mon, 7=Sun
     }
@@ -116,4 +162,11 @@ class Habit {
     'bestStreak': bestStreak,
     'healthScore': healthScore,
   };
+}
+
+/// 周频率统计结果：预期周数 + 去重完成周数
+class _WeeklyStats {
+  final int expected;
+  final int completed;
+  _WeeklyStats(this.expected, this.completed);
 }

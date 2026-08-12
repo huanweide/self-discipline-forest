@@ -64,11 +64,14 @@ class FocusTimerService {
   VoidCallback? onFocusComplete;
   VoidCallback? onBreakComplete;
   VoidCallback? onInterrupted;
+  VoidCallback? onAbandoned;
 
   // Flowmodoro模式专用
   AttentionLevel _attentionLevel = AttentionLevel.focused;
   final List<AttentionLevel> _attentionHistory = [];
-  int _distractedCount = 0;
+  int _interruptCount = 0;            // 离开App的中断次数（interrupt）
+  int _attentionDistractedCount = 0;  // 手动标记分心的次数（markAttention）
+  static const int _interruptThreshold = 3; // 3次离开→结束番茄钟
   static const int _distractedThreshold = 3; // 3次分心→结束番茄钟
 
   FocusTimerService({required int focusMinutes})
@@ -130,17 +133,25 @@ class FocusTimerService {
   /// 中断（用户离开App）——树受伤
   /// 参考Forest的"离开即枯萎"机制，但我们给3次机会
   void interrupt() {
-    _distractedCount++;
-    if (_distractedCount >= _distractedThreshold) {
+    _interruptCount++;
+    if (_interruptCount >= _interruptThreshold) {
       _ticker?.stop();
       _state = _state.copyWith(isRunning: false);
       onInterrupted?.call();
     }
   }
 
+  /// 放弃（用户主动退出）——树枯萎
+  void abandon() {
+    _ticker?.stop();
+    _state = _state.copyWith(isRunning: false);
+    onAbandoned?.call();
+  }
+
   /// 重置中断计数（回到App）
   void resetInterruptCount() {
-    _distractedCount = 0;
+    _interruptCount = 0;
+    _attentionDistractedCount = 0;
   }
 
   /// Flowmodoro模式：手动标记当前注意力水平
@@ -149,8 +160,8 @@ class FocusTimerService {
     _attentionLevel = level;
     _attentionHistory.add(level);
     if (level == AttentionLevel.distracted) {
-      _distractedCount++;
-      if (_distractedCount >= _distractedThreshold && _state.mode == TimerMode.flowmodoro) {
+      _attentionDistractedCount++;
+      if (_attentionDistractedCount >= _distractedThreshold && _state.mode == TimerMode.flowmodoro) {
         _ticker?.stop();
         _state = _state.copyWith(isRunning: false);
         onFocusComplete?.call(); // 提前结束，计算比例休息

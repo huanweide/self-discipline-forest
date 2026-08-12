@@ -19,7 +19,7 @@ class FocusScreen extends ConsumerStatefulWidget {
 }
 
 class _FocusScreenState extends ConsumerState<FocusScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late FocusTimerService _timerService;
   TimerState? _timerState;
   bool _isBreak = false;
@@ -45,12 +45,26 @@ class _FocusScreenState extends ConsumerState<FocusScreen>
       });
     };
     _timerService.onInterrupted = () {
+      _showCompletionDialog('😢 树受伤了', '下次坚持住！');
+    };
+    _timerService.onAbandoned = () {
       _showCompletionDialog('😢 树枯萎了', '下次坚持住！');
     };
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+      _timerService.interrupt();
+    } else if (state == AppLifecycleState.resumed) {
+      _timerService.resetInterruptCount();
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _timerService.dispose();
     super.dispose();
   }
@@ -61,7 +75,8 @@ class _FocusScreenState extends ConsumerState<FocusScreen>
       ..onTick = (state) => setState(() => _timerState = state)
       ..onFocusComplete = () => _showCompletionDialog('🎉 专注完成！', '一棵树成熟了！')
       ..onBreakComplete = () => setState(() { _isBreak = false; _timerState = null; })
-      ..onInterrupted = () => _showCompletionDialog('😢 树枯萎了', '下次坚持住！');
+      ..onInterrupted = () => _showCompletionDialog('😢 树受伤了', '下次坚持住！')
+      ..onAbandoned = () => _showCompletionDialog('😢 树枯萎了', '下次坚持住！');
     _timerService.start(this);
     setState(() => _isBreak = false);
   }
@@ -184,8 +199,20 @@ class _FocusScreenState extends ConsumerState<FocusScreen>
                 _buildMainButton(
                   _isBreak ? '跳过休息' : '放弃这棵树',
                   () {
-                    _timerService.dispose();
-                    _timerService.onInterrupted?.call();
+                    if (_isBreak) {
+                      _timerService.dispose();
+                      setState(() {
+                        _timerState = null;
+                        _isBreak = false;
+                      });
+                    } else {
+                      _timerService.abandon();
+                      setState(() {
+                        _timerState = null;
+                        _isBreak = false;
+                      });
+                      _timerService.dispose();
+                    }
                   },
                   Colors.red,
                 ),
