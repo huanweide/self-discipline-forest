@@ -8,8 +8,6 @@ import '../widgets/countdown_ring.dart';
 import '../widgets/tree_widget.dart';
 
 /// 当前计时器状态
-final timerProvider = StateProvider<FocusTimerService?>((ref) => null);
-final timerStateProvider = StateProvider<TimerState?>((ref) => null);
 final selectedDurationProvider = StateProvider<int>((ref) => 25); // 默认25分钟
 
 class FocusScreen extends ConsumerStatefulWidget {

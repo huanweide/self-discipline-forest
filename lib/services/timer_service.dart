@@ -127,6 +127,7 @@ class FocusTimerService {
 
   /// 恢复
   void resume(TickerProvider vsync) {
+    _ticker?.stop();
     start(vsync);
   }
 

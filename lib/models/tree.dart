@@ -111,14 +111,20 @@ class Forest {
 
   Forest({required this.trees});
 
-  /// 今日种了几棵
-  int get todayCount => trees
-      .where((t) => t.plantedAt.day == DateTime.now().day)
-      .length;
+  /// 今日种了几棵（按年/月/日比较，避免跨月误判）
+  int get todayCount {
+    final now = DateTime.now();
+    return trees
+        .where((t) =>
+            t.plantedAt.year == now.year &&
+            t.plantedAt.month == now.month &&
+            t.plantedAt.day == now.day)
+        .length;
+  }
 
-  /// 总共种活了几棵（不含枯萎和受伤）
+  /// 总共种活了几棵（未枯萎即视为存活，含受伤树）
   int get aliveCount => trees
-      .where((t) => t.stage == TreeStage.mature)
+      .where((t) => t.stage != TreeStage.withered)
       .length;
 
   /// 总共枯萎了几棵（损失厌恶可视化）
