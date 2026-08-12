@@ -58,6 +58,8 @@ class FocusTimerService {
   Timer? _timer;
   Ticker? _ticker; // vsync-based ticker for smoother animation
   TimerState _state;
+  DateTime? _startedAt;          // 本次计时的真实起点
+  int _baseElapsedSeconds = 0;   // 本次运行前的累计秒数（支持暂停/恢复）
   TimerCallback? onTick;
   VoidCallback? onFocusComplete;
   VoidCallback? onBreakComplete;
@@ -83,6 +85,8 @@ class FocusTimerService {
   /// 参考focus-timer的requestAnimationFrame方案
   void start(TickerProvider vsync) {
     _ticker = vsync.createTicker(_onTick);
+    _baseElapsedSeconds = _state.elapsedSeconds;
+    _startedAt = DateTime.now();
     _state = TimerState(
       elapsedSeconds: _state.elapsedSeconds,
       totalSeconds: _state.totalSeconds,
@@ -93,8 +97,10 @@ class FocusTimerService {
     _ticker!.start();
   }
 
-  void _onTick(Duration elapsed) {
-    final newElapsed = _state.elapsedSeconds + 1;
+  void _onTick(Duration _) {
+    if (_startedAt == null) return;
+    final newElapsed = _baseElapsedSeconds +
+        DateTime.now().difference(_startedAt!).inSeconds.abs();
     _state = _state.copyWith(elapsedSeconds: newElapsed);
     onTick?.call(_state);
 
