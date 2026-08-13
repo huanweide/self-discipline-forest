@@ -117,7 +117,7 @@ class FocusTimerService {
   void _onTick(Duration _) {
     if (_startedAt == null) return;
     final newElapsed = _baseElapsedSeconds +
-        DateTime.now().difference(_startedAt!).inSeconds.abs();
+        DateTime.now().difference(_startedAt!).inSeconds;
     _update(_state.copyWith(elapsedSeconds: newElapsed));
     onTick?.call(_state);
 

@@ -292,7 +292,8 @@ class _FocusScreenState extends ConsumerState<FocusScreen>
             child: Center(child: Text(label.split(' ')[0], style: const TextStyle(fontSize: 16))),
           ),
           const SizedBox(height: 4),
-          Text(label.split(' ')[1], style: TextStyle(fontSize: 10, color: Colors.grey.shade600)),
+          Text(label.split(' ').length > 1 ? label.split(' ')[1] : '',
+              style: TextStyle(fontSize: 10, color: Colors.grey.shade600)),
         ],
       ),
     );
