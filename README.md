@@ -5,6 +5,7 @@
 <!-- /badges -->
 
 # 自律森林 (Self-Discipline Forest)
+> **English** · [README_EN.md](./README_EN.md)
 
 > 把每一次专注「种」成一棵树——番茄钟 + 种树游戏化 + 习惯追踪的 Flutter 实验项目。
 > 当前为**开发中原型**：核心计时与数据模型已成形，多数页面仍使用模拟数据。
